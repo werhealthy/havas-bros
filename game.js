@@ -178,6 +178,7 @@ function update() {
     player.onGround = false;
     const overHole = holes.some(h => player.x + player.width > h.x && player.x < h.x + h.width);
     if (player.y + player.height >= groundY && !overHole) {
+      
         player.y = groundY - player.height;
         player.vy = 0;
         player.onGround = true;
@@ -193,7 +194,7 @@ function update() {
     });
 
     if (player.y > canvas.height) triggerGameOver();
-
+  
     // Question block collisions
     blocks.forEach(block => {
         if (!block.used &&
@@ -229,6 +230,7 @@ function update() {
             } else {
                 // Hit from side -> game over
                 triggerGameOver();
+
             }
         }
     });
@@ -306,6 +308,7 @@ function loop() {
     } else {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
     }
+
     requestAnimationFrame(loop);
 }
 
