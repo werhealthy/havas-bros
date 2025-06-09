@@ -2,8 +2,64 @@
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
+// Overlay elements
+const menuEl = document.getElementById('menu');
+const instructionsEl = document.getElementById('instructions');
+const charSelectEl = document.getElementById('charSelect');
+const gameOverEl = document.getElementById('gameOver');
+const playBtn = document.getElementById('playBtn');
+const instrBtn = document.getElementById('instrBtn');
+const exitBtn = document.getElementById('exitBtn');
+const backInstrBtn = document.getElementById('backInstr');
+const retryBtn = document.getElementById('retryBtn');
+const menuBtn = document.getElementById('menuBtn');
+const charOptions = document.querySelectorAll('.character-option');
+
+let gameState = 'menu';
+let selectedCharacter = 'Gigi';
+
+function hideAll() {
+    [menuEl, instructionsEl, charSelectEl, gameOverEl].forEach(el => {
+        if (el) el.style.display = 'none';
+    });
+}
+
+function show(el) {
+    hideAll();
+    if (el) el.style.display = 'flex';
+}
+
+playBtn.onclick = () => {
+    gameState = 'charSelect';
+    show(charSelectEl);
+};
+instrBtn.onclick = () => show(instructionsEl);
+backInstrBtn.onclick = () => show(menuEl);
+exitBtn.onclick = () => show(menuEl); // placeholder
+retryBtn.onclick = () => startGame();
+menuBtn.onclick = () => { gameState = 'menu'; show(menuEl); };
+charOptions.forEach(opt => {
+    opt.addEventListener('click', () => {
+        selectedCharacter = opt.dataset.char;
+        startGame();
+    });
+});
+
+function startGame() {
+    resetPlayer();
+    coinCount = 0;
+    flag.reached = false;
+    gameState = 'playing';
+    show(null);
+}
+
+function triggerGameOver() {
+    gameState = 'gameOver';
+    show(gameOverEl);
+}
+
 // World setup
-const worldWidth = 2000; // simple long level
+const worldWidth = 8000; // much longer level
 const gravity = 0.5;
 const jumpPower = 10;
 
@@ -21,6 +77,14 @@ const player = {
     onGround: false
 };
 
+function resetPlayer() {
+    player.x = 50;
+    player.y = 300;
+    player.vx = 0;
+    player.vy = 0;
+    cameraX = 0;
+}
+
 // Goomba-style enemy constructor
 function Enemy(x, y) {
     this.x = x;
@@ -31,7 +95,10 @@ function Enemy(x, y) {
     this.alive = true;
 }
 
-const enemies = [new Enemy(400, 336), new Enemy(600, 336)];
+const enemies = [];
+for (let i = 400; i < worldWidth; i += 600) {
+    enemies.push(new Enemy(i, 336));
+}
 
 // Question block with coin
 function QuestionBlock(x, y) {
@@ -42,12 +109,33 @@ function QuestionBlock(x, y) {
     this.used = false;
 }
 
-const blocks = [new QuestionBlock(200, 250), new QuestionBlock(750, 250)];
+const blocks = [];
+for (let i = 200; i < worldWidth; i += 500) {
+    blocks.push(new QuestionBlock(i, 250));
+}
 
 let coinCount = 0;
 
+// holes the player can fall into
+const holes = [
+    { x: 500, width: 100 },
+    { x: 1200, width: 150 },
+    { x: 2500, width: 200 },
+    { x: 4200, width: 150 },
+    { x: 6100, width: 150 }
+];
+
+// floating platforms
+const platforms = [
+    { x: 600, y: 300, width: 100, height: 10 },
+    { x: 1600, y: 250, width: 120, height: 10 },
+    { x: 3200, y: 280, width: 100, height: 10 },
+    { x: 4800, y: 230, width: 150, height: 10 },
+    { x: 6500, y: 260, width: 120, height: 10 }
+];
+
 // Level end flag
-const flag = { x: 1800, y: 304, width: 32, height: 96, reached: false };
+const flag = { x: worldWidth - 200, y: 304, width: 32, height: 96, reached: false };
 
 // Camera offset for scrolling
 let cameraX = 0;
@@ -85,13 +173,26 @@ function update() {
     if (player.x + player.width > worldWidth)
         player.x = worldWidth - player.width;
 
-    // Ground collision (simple flat ground)
+    // Ground collision with holes
     const groundY = 368; // ground height
-    if (player.y + player.height >= groundY) {
+    player.onGround = false;
+    const overHole = holes.some(h => player.x + player.width > h.x && player.x < h.x + h.width);
+    if (player.y + player.height >= groundY && !overHole) {
         player.y = groundY - player.height;
         player.vy = 0;
         player.onGround = true;
     }
+
+    // Platform collisions
+    platforms.forEach(p => {
+        if (rectsCollide(player, p) && player.vy >= 0 && player.y + player.height - p.y < 10) {
+            player.y = p.y - player.height;
+            player.vy = 0;
+            player.onGround = true;
+        }
+    });
+
+    if (player.y > canvas.height) triggerGameOver();
 
     // Question block collisions
     blocks.forEach(block => {
@@ -126,10 +227,8 @@ function update() {
                 enemy.alive = false;
                 player.vy = -jumpPower / 1.5; // bounce up
             } else {
-                // Hit from side -> reset player position
-                player.x = 50;
-                player.y = 300;
-                cameraX = 0;
+                // Hit from side -> game over
+                triggerGameOver();
             }
         }
     });
@@ -151,9 +250,20 @@ function draw() {
     ctx.save();
     ctx.translate(-cameraX, 0); // camera movement
 
-    // Draw ground
+    // Draw ground with holes
     ctx.fillStyle = '#654321';
-    ctx.fillRect(0, 368, worldWidth, 32);
+    let gx = 0;
+    holes.forEach(h => {
+        ctx.fillRect(gx, 368, h.x - gx, 32);
+        gx = h.x + h.width;
+    });
+    ctx.fillRect(gx, 368, worldWidth - gx, 32);
+
+    // Draw platforms
+    platforms.forEach(p => {
+        ctx.fillStyle = '#964B00';
+        ctx.fillRect(p.x, p.y, p.width, p.height);
+    });
 
     // Draw question blocks
     blocks.forEach(block => {
@@ -188,8 +298,14 @@ function draw() {
 
 // Main game loop
 function loop() {
-    update();
-    draw();
+    if (gameState === 'playing') {
+        update();
+        draw();
+    } else if (gameState === 'charSelect' || gameState === 'gameOver') {
+        draw(); // show background while overlays displayed
+    } else {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+    }
     requestAnimationFrame(loop);
 }
 
