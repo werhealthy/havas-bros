@@ -13,7 +13,6 @@ function resizeCanvas() {
     flag.y = groundY - flag.height;
 }
 
-
 // Overlay elements
 const menuEl = document.getElementById('menu');
 const instructionsEl = document.getElementById('instructions');
@@ -104,6 +103,7 @@ function resetPlayer() {
 function Enemy(x) {
     this.x = x;
     this.y = groundY - 32;
+
     this.vx = 1; // walking speed
     this.width = 32;
     this.height = 32;
@@ -113,6 +113,7 @@ function Enemy(x) {
 const enemies = [];
 for (let i = 400; i < worldWidth; i += 600) {
     enemies.push(new Enemy(i));
+
 }
 
 // Question block with coin
@@ -156,6 +157,7 @@ const flag = { x: worldWidth - 200, y: 0, width: 32, height: 96, reached: false 
 resizeCanvas();
 window.addEventListener('resize', resizeCanvas);
 
+
 // Camera offset for scrolling
 let cameraX = 0;
 
@@ -196,6 +198,7 @@ function update() {
     player.onGround = false;
     const overHole = holes.some(h => player.x + player.width > h.x && player.x < h.x + h.width);
     if (player.y + player.height >= groundY && !overHole) {
+
         player.y = groundY - player.height;
         player.vy = 0;
         player.onGround = true;
@@ -211,7 +214,6 @@ function update() {
     });
 
     if (player.y > canvas.height) triggerGameOver();
-
     // Question block collisions
     blocks.forEach(block => {
         if (!block.used &&
