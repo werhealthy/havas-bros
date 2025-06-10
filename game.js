@@ -25,6 +25,9 @@ const playerSprites = {
 };
 Object.values(playerSprites).forEach(img => { img.isLoaded = false; });
 
+const coinSheet = new Image();
+coinSheet.isLoaded = false;
+
 function loadSprites() {
     const paths = {
         idle: 'assets/player/player_idle.png',
@@ -51,6 +54,17 @@ function loadSprites() {
             img.src = path;
         });
     });
+
+    promises.push(new Promise(resolve => {
+        coinSheet.onload = () => { coinSheet.isLoaded = true; resolve(); };
+        coinSheet.onerror = () => {
+            coinSheet.onerror = null;
+            coinSheet.src = placeholderSrc;
+            coinSheet.isLoaded = true;
+            resolve();
+        };
+        coinSheet.src = 'assets/coin_anim.png';
+    }));
 
     return Promise.all(promises);
 }
@@ -140,6 +154,9 @@ const gravity = 0.4; // slightly lower for floatier jumps
 const jumpPower = 12; // higher jump power
 const moveSpeed = 4; // horizontal speed
 const RUN_FRAME_SPEED = 8; // frames per running frame
+const COIN_FRAME_SPEED = 6;
+const COIN_FRAMES = 6;
+
 
 // Input state
 const keys = {};
@@ -187,12 +204,14 @@ function QuestionBlock(x, y) {
     this.width = 32;
     this.height = 32;
     this.used = false;
+    this.bounce = 0;
 }
 
 // Populated in setupWorld()
 const blocks = [];
 
 let coinCount = 0;
+const coins = [];
 
 // holes the player can fall into
 const holes = [
@@ -322,25 +341,62 @@ function update() {
     if (player.y > canvas.height / ZOOM) triggerGameOver();
     // Question block collisions (solid blocks)
     blocks.forEach(block => {
-        const overlapX = player.x + player.width > block.x && player.x < block.x + block.width;
-        // hit from below to get coin
-        if (player.vy < 0 && overlapX &&
-            player.y >= block.y + block.height && nextY <= block.y + block.height) {
+        const overlapXNext = nextX + player.width > block.x && nextX < block.x + block.width;
+        const overlapYNext = nextY + player.height > block.y && nextY < block.y + block.height;
+
+        // vertical collisions
+        if (player.vy > 0 && player.y + player.height <= block.y && overlapXNext && nextY + player.height >= block.y) {
+            // land on top
+            player.y = block.y - player.height;
+            player.vy = 0;
+            player.onGround = true;
+        } else if (player.vy < 0 && player.y >= block.y + block.height && overlapXNext && nextY <= block.y + block.height) {
+            // hit bottom of block
             player.y = block.y + block.height;
             player.vy = 0;
             if (!block.used) {
                 block.used = true;
-                coinCount += 1;
+                block.bounce = 4;
+                coins.push({
+                    x: block.x + (block.width - 32) / 2,
+                    y: block.y - 32,
+                    width: 32,
+                    height: 32,
+                    frame: 0,
+                    tick: 0
+                });
             }
         }
-        // land on top
-        if (player.vy > 0 && overlapX &&
-            player.y + player.height <= block.y && nextY + player.height >= block.y) {
-            player.y = block.y - player.height;
-            player.vy = 0;
-            player.onGround = true;
+
+        // horizontal collisions
+        if (overlapYNext) {
+            if (player.vx > 0 && player.x + player.width <= block.x && nextX + player.width > block.x) {
+                player.x = block.x - player.width;
+                player.vx = 0;
+            } else if (player.vx < 0 && player.x >= block.x + block.width && nextX < block.x + block.width) {
+                player.x = block.x + block.width;
+                player.vx = 0;
+            }
         }
+
+        if (block.bounce > 0) block.bounce--;
     });
+
+    // Coin animation and pickup
+    for (let i = coins.length - 1; i >= 0; i--) {
+        const coin = coins[i];
+        coin.tick++;
+        if (coin.tick % COIN_FRAME_SPEED === 0) {
+            coin.frame = (coin.frame + 1) % COIN_FRAMES;
+        }
+        if (player.vy > 0 &&
+            player.x + player.width > coin.x && player.x < coin.x + coin.width &&
+            player.y + player.height <= coin.y && nextY + player.height >= coin.y) {
+            coins.splice(i, 1);
+            coinCount += 1;
+            player.vy = -jumpPower / 2; // small bounce
+        }
+    }
 
     // Enemy logic
     enemies.forEach(enemy => {
@@ -436,10 +492,21 @@ function draw() {
 
     // Draw question blocks
     blocks.forEach(block => {
+        const by = block.y - block.bounce;
         ctx.fillStyle = block.used ? '#888' : '#ff0';
-        ctx.fillRect(block.x, block.y, block.width, block.height);
+        ctx.fillRect(block.x, by, block.width, block.height);
         ctx.fillStyle = '#000';
-        ctx.fillText('?', block.x + 10, block.y + 22);
+        ctx.fillText('?', block.x + 10, by + 22);
+    });
+
+    // Draw spawned coins
+    coins.forEach(coin => {
+        if (coinSheet.isLoaded) {
+            ctx.drawImage(coinSheet, coin.frame * 32, 0, 32, 32, coin.x, coin.y, 32, 32);
+        } else {
+            ctx.fillStyle = '#ff0';
+            ctx.fillRect(coin.x, coin.y, 32, 32);
+        }
     });
 
     // Draw enemies
