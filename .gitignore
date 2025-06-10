@@ -1,0 +1,10 @@
+# immagini
+*.png
+*.jpg
+*.jpeg
+*.gif
+# notebook Jupyter
+*.ipynb
+# eseguibili / altri binari
+*.exe
+*.class
