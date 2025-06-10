@@ -5,7 +5,6 @@ ctx.imageSmoothingEnabled = false; // keep crisp pixels
 
 // Scale factor to zoom in the camera for a closer view
 const ZOOM = 2;
-
 // Resize canvas to full screen and update ground position
 const groundHeight = 32;
 let groundY = 0;
@@ -18,7 +17,6 @@ function resizeCanvas() {
     flag.y = groundY - flag.height;
     setupWorld();
 }
-
 
 // Overlay elements
 const menuEl = document.getElementById('menu');
@@ -68,6 +66,7 @@ show(menuEl);
 
 function startGame() {
     setupWorld();
+
     resetPlayer();
     coinCount = 0;
     flag.reached = false;
@@ -174,7 +173,6 @@ function setupWorld() {
 
     flag.y = groundY - flag.height;
 }
-
 // Initialize canvas size now that flag exists
 resizeCanvas();
 window.addEventListener('resize', resizeCanvas);
@@ -248,7 +246,6 @@ function update() {
     });
 
     if (player.y > canvas.height / ZOOM) triggerGameOver();
-
     // Question block collisions
     blocks.forEach(block => {
         if (!block.used &&
