@@ -7,3 +7,4 @@ Open `index.html` in a modern browser to start playing.
 
 Placeholder graphics are used for player, enemies, and blocks. To customize the player look, place the following files inside `assets/player`:
 `player_idle.png`, `player_run1.png`, `player_run2.png`, `player_jump.png`, `player_crouch.png` and `player_dead.png`.
+All images should be 64×64 pixels; the game scales them to 128×128 when rendering.
