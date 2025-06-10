@@ -14,51 +14,36 @@ const placeholderSrc = createPlaceholder();
 const placeholderImg = new Image();
 placeholderImg.src = placeholderSrc;
 
-// Individual sprite images for the player with load flags
-const playerSprites = {
-    idle: new Image(),
-    run1: new Image(),
-    run2: new Image(),
-    jump: new Image(),
-    crouch: new Image(),
-    dead: new Image()
+// Sprite paths for the player states
+const spritePaths = {
+    idle: 'assets/player/player_idle.png',
+    run: 'assets/player/player_run.png',
+    jump: 'assets/player/player_jump.png',
+    dead: 'assets/player/player_dead.png'
 };
-Object.values(playerSprites).forEach(img => { img.isLoaded = false; });
+
+// Loaded Image objects will be stored here
+const sprites = {};
 
 function loadSprites() {
-    const paths = {
-        idle: 'assets/player/player_idle.png',
-        run1: 'assets/player/player_run1.png',
-        run2: 'assets/player/player_run2.png',
-        jump: 'assets/player/player_jump.png',
-        crouch: 'assets/player/player_crouch.png',
-        dead: 'assets/player/player_dead.png'
-    };
-
-    const promises = Object.entries(paths).map(([state, path]) => {
-        const img = playerSprites[state];
+    const promises = Object.entries(spritePaths).map(([state, path]) => {
+        const img = new Image();
+        sprites[state] = img;
         return new Promise(resolve => {
-            img.onload = () => {
-                img.isLoaded = true;
-                resolve();
-            };
+            img.onload = () => resolve();
             img.onerror = () => {
                 img.onerror = null;
                 img.src = placeholderSrc;
-                img.isLoaded = true;
-                resolve();
             };
+            img.addEventListener('load', resolve, { once: true });
             img.src = path;
         });
     });
-
     return Promise.all(promises);
 }
 
-// Scale factor for in-game camera zoom
+// Scale factor to zoom in the camera for a closer view
 const ZOOM = 2;
-// Sprite scale multiplier for player size relative to tiles
-const SPRITE_SCALE = 2;
 // Resize canvas to full screen and update ground position
 const groundHeight = 32;
 let groundY = 0;
@@ -121,7 +106,10 @@ show(menuEl);
 
 function startGame() {
     setupWorld();
-    resetPlayer();
+
+// Physics tuning for a tighter jump feel
+const gravity = 0.8; // stronger gravity so jumps fall faster
+const jumpPower = 10; // reduced jump power for shorter arc
     flag.reached = false;
     gameState = 'playing';
     playerState = 'idle';
@@ -139,7 +127,6 @@ const worldWidth = 8000; // much longer level
 const gravity = 0.4; // slightly lower for floatier jumps
 const jumpPower = 12; // higher jump power
 const moveSpeed = 4; // horizontal speed
-const RUN_FRAME_SPEED = 8; // frames per running frame
 
 // Input state
 const keys = {};
@@ -150,11 +137,9 @@ const player = {
     y: 300,
     vx: 0,
     vy: 0,
-    width: 32 * SPRITE_SCALE,
-    height: 32 * SPRITE_SCALE,
-    onGround: false,
-    facingLeft: false,
-    isCrouching: false
+    width: 32,
+    height: 32,
+    onGround: false
 };
 
 function resetPlayer() {
@@ -162,8 +147,6 @@ function resetPlayer() {
     player.y = groundY - player.height;
     player.vx = 0;
     player.vy = 0;
-    player.facingLeft = false;
-    player.isCrouching = false;
     cameraX = 0;
 }
 
@@ -242,8 +225,6 @@ window.addEventListener('resize', resizeCanvas);
 
 // Camera offset for scrolling
 let cameraX = 0;
-// Frame counter for animations
-let frameCount = 0;
 
 // Input handling
 window.addEventListener('keydown', e => keys[e.key] = true);
@@ -260,10 +241,8 @@ function update() {
     // Horizontal movement with basic acceleration
     if (keys['ArrowLeft']) {
         player.vx -= 0.5;
-        player.facingLeft = true;
     } else if (keys['ArrowRight']) {
         player.vx += 0.5;
-        player.facingLeft = false;
     } else {
         player.vx *= 0.8; // friction
     }
@@ -275,8 +254,6 @@ function update() {
         player.vy = -jumpPower;
         player.onGround = false;
     }
-
-    player.isCrouching = keys['ArrowDown'] && player.onGround;
 
     // Apply physics
     player.vy += gravity; // gravity
@@ -372,7 +349,12 @@ function update() {
     // Flag collision
     if (rectsCollide(player, flag)) flag.reached = true;
 
-
+    // Update player animation state
+    if (gameState === 'playing') {
+        if (!player.onGround) playerState = 'jump';
+        else if (Math.abs(player.vx) > 0.2) playerState = 'run';
+        else playerState = 'idle';
+    }
 
     // Camera follows player with a bit of smoothing
     let targetCameraX = player.x - (canvas.width / ZOOM) / 2;
@@ -380,35 +362,6 @@ function update() {
     if (targetCameraX > worldWidth - canvas.width / ZOOM)
         targetCameraX = worldWidth - canvas.width / ZOOM;
     cameraX += (targetCameraX - cameraX) * 0.1;
-}
-
-function drawPlayer(ctx) {
-    frameCount++;
-    let img = playerSprites.idle;
-
-    if (playerState === 'dead') img = playerSprites.dead;
-    else if (!player.onGround) img = playerSprites.jump;
-    else if (player.isCrouching) img = playerSprites.crouch;
-    else if (Math.abs(player.vx) > 0.1) {
-        const frame = Math.floor(frameCount / RUN_FRAME_SPEED) % 2;
-        img = frame === 0 ? playerSprites.run1 : playerSprites.run2;
-    }
-
-    if (!img.isLoaded) img = placeholderImg;
-
-    const drawW = player.width;
-    const drawH = player.height;
-    const drawX = player.x;
-    const drawY = player.y - (drawH - player.height);
-
-    if (player.facingLeft) {
-        ctx.save();
-        ctx.scale(-1, 1);
-        ctx.drawImage(img, -drawX - drawW, drawY, drawW, drawH);
-        ctx.restore();
-    } else {
-        ctx.drawImage(img, drawX, drawY, drawW, drawH);
-    }
 }
 
 // Draw everything
@@ -453,8 +406,9 @@ function draw() {
     ctx.fillStyle = '#fff';
     ctx.fillRect(flag.x, flag.y, flag.width, flag.height);
 
-    // Draw player sprite
-    drawPlayer(ctx);
+    // Draw player using sprite based on state
+    const currentImg = sprites[playerState] ?? placeholderImg;
+    ctx.drawImage(currentImg, player.x, player.y, player.width, player.height);
 
     ctx.restore();
 
