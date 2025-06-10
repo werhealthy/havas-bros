@@ -3,6 +3,45 @@ const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 ctx.imageSmoothingEnabled = false; // keep crisp pixels
 
+// Utility to create a 1x1 transparent image data URL
+function createPlaceholder() {
+    const c = document.createElement('canvas');
+    c.width = c.height = 1;
+    return c.toDataURL();
+}
+
+const placeholderSrc = createPlaceholder();
+const placeholderImg = new Image();
+placeholderImg.src = placeholderSrc;
+
+// Sprite paths for the player states
+const spritePaths = {
+    idle: 'assets/player/player_idle.png',
+    run: 'assets/player/player_run.png',
+    jump: 'assets/player/player_jump.png',
+    dead: 'assets/player/player_dead.png'
+};
+
+// Loaded Image objects will be stored here
+const sprites = {};
+
+function loadSprites() {
+    const promises = Object.entries(spritePaths).map(([state, path]) => {
+        const img = new Image();
+        sprites[state] = img;
+        return new Promise(resolve => {
+            img.onload = () => resolve();
+            img.onerror = () => {
+                img.onerror = null;
+                img.src = placeholderSrc;
+            };
+            img.addEventListener('load', resolve, { once: true });
+            img.src = path;
+        });
+    });
+    return Promise.all(promises);
+}
+
 // Scale factor to zoom in the camera for a closer view
 const ZOOM = 2;
 // Resize canvas to full screen and update ground position
@@ -33,6 +72,7 @@ const charOptions = document.querySelectorAll('.character-option');
 
 let gameState = 'menu';
 let selectedCharacter = 'Gigi';
+let playerState = 'idle';
 
 function hideAll() {
     [menuEl, instructionsEl, charSelectEl, gameOverEl].forEach(el => {
@@ -72,11 +112,13 @@ const gravity = 0.8; // stronger gravity so jumps fall faster
 const jumpPower = 10; // reduced jump power for shorter arc
     flag.reached = false;
     gameState = 'playing';
+    playerState = 'idle';
     show(null);
 }
 
 function triggerGameOver() {
     gameState = 'gameOver';
+    playerState = 'dead';
     show(gameOverEl);
 }
 
@@ -307,6 +349,13 @@ function update() {
     // Flag collision
     if (rectsCollide(player, flag)) flag.reached = true;
 
+    // Update player animation state
+    if (gameState === 'playing') {
+        if (!player.onGround) playerState = 'jump';
+        else if (Math.abs(player.vx) > 0.2) playerState = 'run';
+        else playerState = 'idle';
+    }
+
     // Camera follows player with a bit of smoothing
     let targetCameraX = player.x - (canvas.width / ZOOM) / 2;
     if (targetCameraX < 0) targetCameraX = 0;
@@ -357,9 +406,9 @@ function draw() {
     ctx.fillStyle = '#fff';
     ctx.fillRect(flag.x, flag.y, flag.width, flag.height);
 
-    // Draw player
-    ctx.fillStyle = '#0f0';
-    ctx.fillRect(player.x, player.y, player.width, player.height);
+    // Draw player using sprite based on state
+    const currentImg = sprites[playerState] ?? placeholderImg;
+    ctx.drawImage(currentImg, player.x, player.y, player.width, player.height);
 
     ctx.restore();
 
@@ -382,5 +431,7 @@ function loop() {
     requestAnimationFrame(loop);
 }
 
-// Kick off
-requestAnimationFrame(loop);
+// Kick off after sprites load
+loadSprites().then(() => {
+    requestAnimationFrame(loop);
+});
