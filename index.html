@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Havas Bros</title>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <style>
+        body { margin: 0; background: #000; overflow: hidden; }
+        canvas {
+            display: block;
+            background: #5c94fc;
+            image-rendering: pixelated;
+            width: 100%;
+            height: 100%;
+        }
+        #ui {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            color: #fff;
+            font-family: 'Press Start 2P', monospace;
+        }
+        .overlay {
+            display: none;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            text-align: center;
+        }
+        button { margin: 5px; padding: 10px 20px; font-size: 20px; }
+        .character-option {
+            width: 50px;
+            height: 50px;
+            margin: 10px;
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: #000;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas" width="800" height="400"></canvas>
+    <div id="ui">
+        <div id="menu" class="overlay" style="display:flex;">
+            <button id="playBtn">Gioca</button>
+            <button id="instrBtn">Istruzioni</button>
+            <button id="exitBtn">Esci</button>
+        </div>
+        <div id="instructions" class="overlay">
+            <p>Usa le frecce per muovere e saltare. Colpisci i blocchi "?" per ottenere monete e raggiungi la bandiera.</p>
+            <button id="backInstr">Menu</button>
+        </div>
+        <div id="charSelect" class="overlay">
+            <p>Scegli il tuo personaggio</p>
+            <div>
+                <div class="character-option" data-char="Gigi" style="background:#0f0">G</div>
+                <div class="character-option" data-char="Mario" style="background:#f00">M</div>
+                <div class="character-option" data-char="Daphne" style="background:#ff0">D</div>
+            </div>
+        </div>
+        <div id="gameOver" class="overlay">
+            <h1>Game Over</h1>
+            <button id="retryBtn">Riprova</button>
+            <button id="menuBtn">Menu</button>
+        </div>
+    </div>
+    <script src="game.js"></script>
+</body>
+</html>
