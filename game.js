@@ -67,8 +67,9 @@ show(menuEl);
 function startGame() {
     setupWorld();
 
-    resetPlayer();
-    coinCount = 0;
+// Physics tuning for a tighter jump feel
+const gravity = 0.8; // stronger gravity so jumps fall faster
+const jumpPower = 10; // reduced jump power for shorter arc
     flag.reached = false;
     gameState = 'playing';
     show(null);
@@ -164,7 +165,10 @@ function setupWorld() {
 
     blocks.length = 0;
     for (let i = 200; i < worldWidth; i += 500) {
-        blocks.push(new QuestionBlock(i, groundY - 96));
+        const insideHole = holes.some(h => i + 32 > h.x && i < h.x + h.width);
+        if (!insideHole) {
+            blocks.push(new QuestionBlock(i, groundY - 96));
+        }
     }
 
     platforms.forEach(p => {
@@ -211,8 +215,9 @@ function update() {
 
     // Apply physics
     player.vy += gravity; // gravity
+    const nextX = player.x + player.vx;
     const nextY = player.y + player.vy;
-    player.x += player.vx;
+    player.x = nextX;
 
     // Simple world bounds
     if (player.x < 0) player.x = 0;
@@ -230,43 +235,57 @@ function update() {
         player.y = nextY;
     }
 
-    // Platform collisions
+    // Platform collisions (solid from all sides)
     platforms.forEach(p => {
-        const onPlatform =
-            player.x + player.width > p.x &&
-            player.x < p.x + p.width &&
-            player.y + player.height <= p.y &&
-            nextY + player.height >= p.y &&
-            player.vy >= 0;
-        if (onPlatform) {
+        // landing on top
+        if (player.vy > 0 &&
+            player.x + player.width > p.x && player.x < p.x + p.width &&
+            player.y + player.height <= p.y && nextY + player.height >= p.y) {
             player.y = p.y - player.height;
             player.vy = 0;
             player.onGround = true;
         }
+        // hitting the underside
+        if (player.vy < 0 &&
+            player.x + player.width > p.x && player.x < p.x + p.width &&
+            player.y >= p.y + p.height && nextY <= p.y + p.height) {
+            player.y = p.y + p.height;
+            player.vy = 0;
+        }
     });
 
     if (player.y > canvas.height / ZOOM) triggerGameOver();
-    // Question block collisions
+    // Question block collisions (solid blocks)
     blocks.forEach(block => {
-        if (!block.used &&
-            rectsCollide(player, {
-                x: block.x,
-                y: block.y - 5, // a bit lower to catch head bump
-                width: block.width,
-                height: 5
-            }) && player.vy < 0) {
-            block.used = true;
-            coinCount += 1; // collect coin
-            player.vy = 2; // small bounce down
+        const overlapX = player.x + player.width > block.x && player.x < block.x + block.width;
+        // hit from below to get coin
+        if (player.vy < 0 && overlapX &&
+            player.y >= block.y + block.height && nextY <= block.y + block.height) {
+            player.y = block.y + block.height;
+            player.vy = 0;
+            if (!block.used) {
+                block.used = true;
+                coinCount += 1;
+            }
+        }
+        // land on top
+        if (player.vy > 0 && overlapX &&
+            player.y + player.height <= block.y && nextY + player.height >= block.y) {
+            player.y = block.y - player.height;
+            player.vy = 0;
+            player.onGround = true;
         }
     });
 
     // Enemy logic
     enemies.forEach(enemy => {
         if (!enemy.alive) return;
+        // move away from the player
+        enemy.vx = player.x < enemy.x ? 1 : -1;
         enemy.x += enemy.vx;
-        // turn around at edges
-        if (enemy.x < 0 || enemy.x + enemy.width > worldWidth) enemy.vx *= -1;
+        // prevent leaving the world
+        if (enemy.x < 0) enemy.x = 0;
+        if (enemy.x + enemy.width > worldWidth) enemy.x = worldWidth - enemy.width;
 
         // Collision with ground
         if (enemy.y + enemy.height < groundY) enemy.y += gravity;
