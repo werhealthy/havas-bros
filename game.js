@@ -14,28 +14,21 @@ const placeholderSrc = createPlaceholder();
 const placeholderImg = new Image();
 placeholderImg.src = placeholderSrc;
 
-// Individual sprite images for the player
-const playerSprites = {
-    idle: new Image(),
-    run1: new Image(),
-    run2: new Image(),
-    jump: new Image(),
-    crouch: new Image(),
-    dead: new Image()
+// Sprite paths for the player states
+const spritePaths = {
+    idle: 'assets/player/player_idle.png',
+    run: 'assets/player/player_run.png',
+    jump: 'assets/player/player_jump.png',
+    dead: 'assets/player/player_dead.png'
 };
 
-function loadSprites() {
-    const paths = {
-        idle: 'assets/player/player_idle.png',
-        run1: 'assets/player/player_run1.png',
-        run2: 'assets/player/player_run2.png',
-        jump: 'assets/player/player_jump.png',
-        crouch: 'assets/player/player_crouch.png',
-        dead: 'assets/player/player_dead.png'
-    };
+// Loaded Image objects will be stored here
+const sprites = {};
 
-    const promises = Object.entries(paths).map(([state, path]) => {
-        const img = playerSprites[state];
+function loadSprites() {
+    const promises = Object.entries(spritePaths).map(([state, path]) => {
+        const img = new Image();
+        sprites[state] = img;
         return new Promise(resolve => {
             img.onload = () => resolve();
             img.onerror = () => {
@@ -46,7 +39,6 @@ function loadSprites() {
             img.src = path;
         });
     });
-
     return Promise.all(promises);
 }
 
@@ -233,8 +225,6 @@ window.addEventListener('resize', resizeCanvas);
 
 // Camera offset for scrolling
 let cameraX = 0;
-// Counter used to alternate running animation frames
-let runAnim = 0;
 
 // Input handling
 window.addEventListener('keydown', e => keys[e.key] = true);
@@ -361,15 +351,9 @@ function update() {
 
     // Update player animation state
     if (gameState === 'playing') {
-        if (!player.onGround) {
-            playerState = 'jump';
-        } else if (Math.abs(player.vx) > 0.2) {
-            playerState = 'run';
-            runAnim = (runAnim + 1) % 20; // advance run animation counter
-        } else {
-            playerState = 'idle';
-            runAnim = 0;
-        }
+        if (!player.onGround) playerState = 'jump';
+        else if (Math.abs(player.vx) > 0.2) playerState = 'run';
+        else playerState = 'idle';
     }
 
     // Camera follows player with a bit of smoothing
@@ -423,13 +407,7 @@ function draw() {
     ctx.fillRect(flag.x, flag.y, flag.width, flag.height);
 
     // Draw player using sprite based on state
-    let currentImg;
-    if (playerState === 'run') {
-        currentImg = (runAnim < 10 ? playerSprites.run1 : playerSprites.run2);
-    } else {
-        currentImg = playerSprites[playerState];
-    }
-    if (!currentImg) currentImg = placeholderImg;
+    const currentImg = sprites[playerState] ?? placeholderImg;
     ctx.drawImage(currentImg, player.x, player.y, player.width, player.height);
 
     ctx.restore();
