@@ -1,7 +1,10 @@
 // Basic 2D side scroller inspired by classic platformers
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
+ctx.imageSmoothingEnabled = false; // keep crisp pixels
 
+// Scale factor to zoom in the camera for a closer view
+const ZOOM = 2;
 // Resize canvas to full screen and update ground position
 const groundHeight = 32;
 let groundY = 0;
@@ -9,8 +12,10 @@ let groundY = 0;
 function resizeCanvas() {
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
-    groundY = canvas.height - groundHeight;
+    // groundY is calculated on the unscaled coordinate system
+    groundY = canvas.height / ZOOM - groundHeight;
     flag.y = groundY - flag.height;
+    setupWorld();
 }
 
 // Overlay elements
@@ -60,6 +65,8 @@ charOptions.forEach(opt => {
 show(menuEl);
 
 function startGame() {
+    setupWorld();
+
     resetPlayer();
     coinCount = 0;
     flag.reached = false;
@@ -74,8 +81,9 @@ function triggerGameOver() {
 
 // World setup
 const worldWidth = 8000; // much longer level
-const gravity = 0.5;
-const jumpPower = 10;
+const gravity = 0.4; // slightly lower for floatier jumps
+const jumpPower = 12; // higher jump power
+const moveSpeed = 4; // horizontal speed
 
 // Input state
 const keys = {};
@@ -103,18 +111,14 @@ function resetPlayer() {
 function Enemy(x) {
     this.x = x;
     this.y = groundY - 32;
-
     this.vx = 1; // walking speed
     this.width = 32;
     this.height = 32;
     this.alive = true;
 }
 
+// Populated in setupWorld()
 const enemies = [];
-for (let i = 400; i < worldWidth; i += 600) {
-    enemies.push(new Enemy(i));
-
-}
 
 // Question block with coin
 function QuestionBlock(x, y) {
@@ -125,10 +129,8 @@ function QuestionBlock(x, y) {
     this.used = false;
 }
 
+// Populated in setupWorld()
 const blocks = [];
-for (let i = 200; i < worldWidth; i += 500) {
-    blocks.push(new QuestionBlock(i, 250));
-}
 
 let coinCount = 0;
 
@@ -141,22 +143,39 @@ const holes = [
     { x: 6100, width: 150 }
 ];
 
-// floating platforms
+// floating platforms (rel values are height above ground)
 const platforms = [
-    { x: 600, y: 300, width: 100, height: 10 },
-    { x: 1600, y: 250, width: 120, height: 10 },
-    { x: 3200, y: 280, width: 100, height: 10 },
-    { x: 4800, y: 230, width: 150, height: 10 },
-    { x: 6500, y: 260, width: 120, height: 10 }
+    { x: 600, rel: 100, width: 100, height: 10 },
+    { x: 1600, rel: 150, width: 120, height: 10 },
+    { x: 3200, rel: 120, width: 100, height: 10 },
+    { x: 4800, rel: 170, width: 150, height: 10 },
+    { x: 6500, rel: 140, width: 120, height: 10 }
 ];
 
 // Level end flag
 const flag = { x: worldWidth - 200, y: 0, width: 32, height: 96, reached: false };
 
+// Position enemies, blocks and platforms relative to ground
+function setupWorld() {
+    enemies.length = 0;
+    for (let i = 400; i < worldWidth; i += 600) {
+        enemies.push(new Enemy(i));
+    }
+
+    blocks.length = 0;
+    for (let i = 200; i < worldWidth; i += 500) {
+        blocks.push(new QuestionBlock(i, groundY - 96));
+    }
+
+    platforms.forEach(p => {
+        p.y = groundY - p.rel;
+    });
+
+    flag.y = groundY - flag.height;
+}
 // Initialize canvas size now that flag exists
 resizeCanvas();
 window.addEventListener('resize', resizeCanvas);
-
 
 // Camera offset for scrolling
 let cameraX = 0;
@@ -173,10 +192,16 @@ function rectsCollide(a, b) {
 
 // Main update function
 function update() {
-    // Horizontal movement
-    if (keys['ArrowLeft']) player.vx = -3;
-    else if (keys['ArrowRight']) player.vx = 3;
-    else player.vx = 0;
+    // Horizontal movement with basic acceleration
+    if (keys['ArrowLeft']) {
+        player.vx -= 0.5;
+    } else if (keys['ArrowRight']) {
+        player.vx += 0.5;
+    } else {
+        player.vx *= 0.8; // friction
+    }
+    if (player.vx > moveSpeed) player.vx = moveSpeed;
+    if (player.vx < -moveSpeed) player.vx = -moveSpeed;
 
     // Jumping
     if (keys['ArrowUp'] && player.onGround) {
@@ -186,8 +211,8 @@ function update() {
 
     // Apply physics
     player.vy += gravity; // gravity
+    const nextY = player.y + player.vy;
     player.x += player.vx;
-    player.y += player.vy;
 
     // Simple world bounds
     if (player.x < 0) player.x = 0;
@@ -197,23 +222,30 @@ function update() {
     // Ground collision with holes
     player.onGround = false;
     const overHole = holes.some(h => player.x + player.width > h.x && player.x < h.x + h.width);
-    if (player.y + player.height >= groundY && !overHole) {
-
+    if (nextY + player.height >= groundY && !overHole) {
         player.y = groundY - player.height;
         player.vy = 0;
         player.onGround = true;
+    } else {
+        player.y = nextY;
     }
 
     // Platform collisions
     platforms.forEach(p => {
-        if (rectsCollide(player, p) && player.vy >= 0 && player.y + player.height - p.y < 10) {
+        const onPlatform =
+            player.x + player.width > p.x &&
+            player.x < p.x + p.width &&
+            player.y + player.height <= p.y &&
+            nextY + player.height >= p.y &&
+            player.vy >= 0;
+        if (onPlatform) {
             player.y = p.y - player.height;
             player.vy = 0;
             player.onGround = true;
         }
     });
 
-    if (player.y > canvas.height) triggerGameOver();
+    if (player.y > canvas.height / ZOOM) triggerGameOver();
     // Question block collisions
     blocks.forEach(block => {
         if (!block.used &&
@@ -256,11 +288,12 @@ function update() {
     // Flag collision
     if (rectsCollide(player, flag)) flag.reached = true;
 
-    // Camera follows player
-    cameraX = player.x - canvas.width / 2;
-    if (cameraX < 0) cameraX = 0;
-    if (cameraX > worldWidth - canvas.width)
-        cameraX = worldWidth - canvas.width;
+    // Camera follows player with a bit of smoothing
+    let targetCameraX = player.x - (canvas.width / ZOOM) / 2;
+    if (targetCameraX < 0) targetCameraX = 0;
+    if (targetCameraX > worldWidth - canvas.width / ZOOM)
+        targetCameraX = worldWidth - canvas.width / ZOOM;
+    cameraX += (targetCameraX - cameraX) * 0.1;
 }
 
 // Draw everything
@@ -268,6 +301,7 @@ function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     ctx.save();
+    ctx.scale(ZOOM, ZOOM); // zoom in the scene
     ctx.translate(-cameraX, 0); // camera movement
 
     // Draw ground with holes
