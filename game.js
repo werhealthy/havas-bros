@@ -17,7 +17,8 @@ placeholderImg.src = placeholderSrc;
 // Sprite paths for the player states
 const spritePaths = {
     idle: 'assets/player/player_idle.png',
-    run: 'assets/player/player_run.png',
+    run1: 'assets/player/player_run1.png',
+    run2: 'assets/player/player_run2.png',
     jump: 'assets/player/player_jump.png',
     dead: 'assets/player/player_dead.png'
 };
@@ -137,8 +138,8 @@ const player = {
     y: 300,
     vx: 0,
     vy: 0,
-    width: 32,
-    height: 32,
+    width: 56,
+    height: 56,
     onGround: false
 };
 
@@ -225,6 +226,7 @@ window.addEventListener('resize', resizeCanvas);
 
 // Camera offset for scrolling
 let cameraX = 0;
+let frameCount = 0;
 
 // Input handling
 window.addEventListener('keydown', e => keys[e.key] = true);
@@ -238,6 +240,7 @@ function rectsCollide(a, b) {
 
 // Main update function
 function update() {
+    frameCount++;
     // Previous position before applying physics
     const prevY = player.y;
     // Horizontal movement with basic acceleration
@@ -271,7 +274,8 @@ function update() {
     // Ground collision with holes
     player.onGround = false;
     const overHole = holes.some(h => player.x + player.width > h.x && player.x < h.x + h.width);
-    if (nextY + player.height >= groundY && !overHole) {
+    if (player.vy >= 0 && prevY + player.height <= groundY &&
+        nextY + player.height >= groundY && !overHole) {
         player.y = groundY - player.height;
         player.vy = 0;
         player.onGround = true;
@@ -408,9 +412,14 @@ function draw() {
     ctx.fillStyle = '#fff';
     ctx.fillRect(flag.x, flag.y, flag.width, flag.height);
 
-    // Draw player using sprite based on state
-    const currentImg = sprites[playerState] ?? placeholderImg;
-    ctx.drawImage(currentImg, player.x, player.y, 128, 128);
+    // Draw player with basic running animation
+    let spriteKey = playerState;
+    if (playerState === 'run') {
+        const frame = Math.floor(frameCount / 8) % 2;
+        spriteKey = frame === 0 ? 'run1' : 'run2';
+    }
+    const currentImg = sprites[spriteKey] ?? placeholderImg;
+    ctx.drawImage(currentImg, player.x, player.y, player.width, player.height);
 
     ctx.restore();
 
