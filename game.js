@@ -238,8 +238,6 @@ function rectsCollide(a, b) {
 
 // Main update function
 function update() {
-    // Previous position before applying physics
-    const prevY = player.y;
     // Horizontal movement with basic acceleration
     if (keys['ArrowLeft']) {
         player.vx -= 0.5;
@@ -284,7 +282,7 @@ function update() {
         // landing on top
         if (player.vy > 0 &&
             player.x + player.width > p.x && player.x < p.x + p.width &&
-            prevY + player.height <= p.y && player.y + player.height >= p.y) {
+            player.y + player.height <= p.y && nextY + player.height >= p.y) {
             player.y = p.y - player.height;
             player.vy = 0;
             player.onGround = true;
@@ -292,7 +290,7 @@ function update() {
         // hitting the underside
         if (player.vy < 0 &&
             player.x + player.width > p.x && player.x < p.x + p.width &&
-            prevY >= p.y + p.height && player.y <= p.y + p.height) {
+            player.y >= p.y + p.height && nextY <= p.y + p.height) {
             player.y = p.y + p.height;
             player.vy = 0;
         }
@@ -304,7 +302,7 @@ function update() {
         const overlapX = player.x + player.width > block.x && player.x < block.x + block.width;
         // hit from below to get coin
         if (player.vy < 0 && overlapX &&
-            prevY >= block.y + block.height && player.y <= block.y + block.height) {
+            player.y >= block.y + block.height && nextY <= block.y + block.height) {
             player.y = block.y + block.height;
             player.vy = 0;
             if (!block.used) {
@@ -314,7 +312,7 @@ function update() {
         }
         // land on top
         if (player.vy > 0 && overlapX &&
-            prevY + player.height <= block.y && player.y + player.height >= block.y) {
+            player.y + player.height <= block.y && nextY + player.height >= block.y) {
             player.y = block.y - player.height;
             player.vy = 0;
             player.onGround = true;
@@ -410,7 +408,7 @@ function draw() {
 
     // Draw player using sprite based on state
     const currentImg = sprites[playerState] ?? placeholderImg;
-    ctx.drawImage(currentImg, player.x, player.y, 128, 128);
+    ctx.drawImage(currentImg, player.x, player.y, player.width, player.height);
 
     ctx.restore();
 
